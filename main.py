@@ -1,52 +1,91 @@
-import time
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
-# from selenium.webdriver.support.ui import WebDriverWait
-# from selenium.webdriver.support import expected_conditions as EC
-print('start app')
-options = Options()
+import requests, json
+from fake_useragent import UserAgent
+from Bot.DB.db import Database
 
-options.add_argument("--disable-blink-features=AutomationControlled")
-print("disable-blink-features=AutomationControlled")
-options.add_argument("--start-maximized")
-print("start-maximized")
-driver = webdriver.Chrome(
-    service=Service(ChromeDriverManager().install()),
-    options=options
-)
-print('create browers')
-driver.get("https://www.coinmarketcap.com/")
+from colorama import Fore, Style, init
+init()
 
-time.sleep(9)
 
-previous_row_count = 0
-links = []
-print('start while')
-while True:
-    driver.execute_script("window.scrollBy(0, 800);")
-    time.sleep(1.5)
-    rows = driver.find_elements(By.XPATH, "//div[@class='sc-4c05d6ef-0 sc-8dd8fbb5-0 dlQYLv urcFe']")
-    for row in rows:
+class CoinMarketCapAPI:
+    def __init__(self):
+        self.ua = UserAgent()
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': self.ua.random,
+            "Accept": "application/json",
+            "Referer": "https://coinmarketcap.com/"
+        })
+        self.URL_COIN_ID = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/listing"
+        self.db = Database()
+
+    def get_total_coinId(self, start=1, limit=1):
+        params = {"start": start, "limit": limit}
         try:
-            link = row.find_element(By.XPATH, './/a[contains(@href, "/currencies/")]').get_attribute('href')
-            if "coinmarketcap-20-index" in link:
+            r = self.session.get(self.URL_COIN_ID, params=params)
+            r.raise_for_status()
+            data = r.json()
+            return data["data"]["totalCount"]
+        except Exception as e:
+            print(f"An error occurred while fetching total coin IDs: {e}")
+            return None
+        
+    def start_scrap(self, limit, start=1):
+        params = {"start": start, "limit": limit}
+        try:
+            r = self.session.get(self.URL_COIN_ID, params=params)
+            r.raise_for_status()
+            data = r.json()
+            return data["data"]["cryptoCurrencyList"]
+        except Exception as e:
+            print(f"An error occurred while fetching total coin IDs: {e}")
+            return None
+    
+    def show_mune(self):
+                print(Fore.CYAN + """
+        ╔════════════════════════════════════════╗
+        ║        Multi CoinMarketCap Menu        ║
+        ╠════════════════════════════════════════╣
+        ║  [1]. Extract cryptocurrency IDs       ║
+        ║  [2]. Extract cryptocurrency data      ║
+        ║  [3]. Exit                             ║
+        ╚════════════════════════════════════════╝
+        """ + Style.RESET_ALL)
+    def start(self):
+        self.show_mune()
+        while True:
+            try:
+                choice = int(input("Select Choice: "))
+            except ValueError:
+                print("Invalid input. Please enter a number.")
                 continue
-            print(link)
-            links.append(link)
-        except Exception:
-            continue
-    current_row_count = len(rows)
-    if current_row_count == previous_row_count:
-        print("تمام لینک‌ها بارگذاری شدند.")
-        break
-    previous_row_count = current_row_count
+            
+            if choice > 3 or choice < 1:
+                print("Invalid input. Please enter a number between 1 and 3.")
+                continue
+            
+            if choice == 3:
+                print('GoodBye✨')
+                break
+            
+            if choice == 1:
+                total_coinId = self.get_total_coinId()
+                print(f"Total coin IDs: {total_coinId}")
+                while True:
+                    try:
+                        count_coin_id = int(
+                            input(f"[INPUT] Number of coins to extract (min : 1 ,max : {total_coinId}): ")
+                        )
 
-for link in links:
-    print(link)
-
-print(len(links))
-
-driver.quit()
+                        if 1 <= count_coin_id <= total_coinId:
+                            break
+                        
+                        print(f"Invalid input. Please enter a number between 1 and, {total_coinId}")
+                        
+                    except ValueError:
+                        print("Invalid input. Please enter a number.")
+                        continue
+                
+                
+start = CoinMarketCapAPI()
+if __name__ == "__main__":
+    start.start()
